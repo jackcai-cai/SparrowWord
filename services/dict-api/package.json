@@ -1,0 +1,24 @@
+{
+  "name": "@sparrowword/dict-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "fastify": "5.6.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "24.3.1",
+    "tsx": "4.20.5",
+    "typescript": "5.8.3"
+  }
+}

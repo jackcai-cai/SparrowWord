@@ -1,0 +1,24 @@
+{
+  "name": "@sparrowword/web",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:poll": "SPARROWWORD_WATCH_POLLING=1 next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test ./lib/**/*.test.ts",
+    "smoke": "node ./scripts/workspace-smoke.mjs"
+  },
+  "dependencies": {
+    "next": "^16.2.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9",
+    "typescript": "5.8.3"
+  }
+}
