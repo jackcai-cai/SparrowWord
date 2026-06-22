@@ -30,19 +30,23 @@ nonisolated final class OpenEnglishWordNetService {
             return nil
         }
 
-        let databasePath = databaseURL(for: manifest).path
-        guard fileManager.fileExists(atPath: databasePath) else {
+        let dbURL = databaseURL(for: manifest)
+        guard fileManager.fileExists(atPath: dbURL.path),
+              let database = try? SQLiteDatabase(
+                url: dbURL,
+                flags: SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+              ) else {
             return nil
         }
 
-        let entries = lookupEntries(term: cleanedTerm, kind: kind, databasePath: databasePath)
+        let entries = lookupEntries(term: cleanedTerm, kind: kind, database: database)
         guard !entries.isEmpty else {
             return nil
         }
 
         let synsets = lookupSynsets(
             ids: entries.flatMap(\.synsetIDs),
-            databasePath: databasePath
+            database: database
         )
 
         let pronunciation = preferredPronunciation(from: entries)
@@ -89,8 +93,12 @@ nonisolated final class OpenEnglishWordNetService {
             return []
         }
 
-        let databasePath = databaseURL(for: manifest).path
-        guard fileManager.fileExists(atPath: databasePath) else {
+        let dbURL = databaseURL(for: manifest)
+        guard fileManager.fileExists(atPath: dbURL.path),
+              let database = try? SQLiteDatabase(
+                url: dbURL,
+                flags: SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+              ) else {
             return []
         }
 
@@ -101,11 +109,11 @@ nonisolated final class OpenEnglishWordNetService {
             for candidate in Array(normalizedLookupCandidates(for: cleanedTerm, kind: kind).dropFirst()) {
                 suggestions.append(
                     contentsOf: lookupSuggestionsForLemmas(
-                        lemmas(forForm: candidate, databasePath: databasePath),
+                        lemmas(forForm: candidate, database: database),
                         originalTerm: cleanedTerm,
                         fallbackKind: kind,
                         reason: .inflection,
-                        databasePath: databasePath
+                        database: database
                     )
                 )
             }
@@ -113,11 +121,11 @@ nonisolated final class OpenEnglishWordNetService {
 
         suggestions.append(
             contentsOf: lookupSuggestionsForEntries(
-                prefixEntries(prefix: cleanedTerm, databasePath: databasePath, limit: expandedLimit),
+                prefixEntries(prefix: cleanedTerm, database: database, limit: expandedLimit),
                 originalTerm: cleanedTerm,
                 fallbackKind: kind,
                 reason: .prefix,
-                databasePath: databasePath
+                database: database
             )
         )
 
@@ -160,14 +168,14 @@ nonisolated final class OpenEnglishWordNetService {
             .appendingPathComponent("oewn.sqlite")
     }
 
-    private func lookupEntries(term: String, kind: EntryKind, databasePath: String) -> [EntryRow] {
+    private func lookupEntries(term: String, kind: EntryKind, database: SQLiteDatabase) -> [EntryRow] {
         let candidates = normalizedLookupCandidates(for: term, kind: kind)
         guard !candidates.isEmpty else {
             return []
         }
 
         for candidate in candidates {
-            let exactEntries = entryRows(forLemma: candidate, databasePath: databasePath)
+            let exactEntries = entryRows(forLemma: candidate, database: database)
             if !exactEntries.isEmpty {
                 return exactEntries
             }
@@ -175,21 +183,17 @@ nonisolated final class OpenEnglishWordNetService {
 
         var inferredEntries: [EntryRow] = []
         for candidate in candidates {
-            let lemmas = lemmas(forForm: candidate, databasePath: databasePath)
+            let lemmas = lemmas(forForm: candidate, database: database)
             for lemma in lemmas {
-                inferredEntries.append(contentsOf: entryRows(forLemma: lemma, databasePath: databasePath))
+                inferredEntries.append(contentsOf: entryRows(forLemma: lemma, database: database))
             }
         }
 
         return deduplicatedEntries(inferredEntries)
     }
 
-    private func entryRows(forLemma lemma: String, databasePath: String) -> [EntryRow] {
+    private func entryRows(forLemma lemma: String, database: SQLiteDatabase) -> [EntryRow] {
         do {
-            let database = try SQLiteDatabase(
-                url: URL(fileURLWithPath: databasePath),
-                flags: SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
-            )
             let statement = try database.prepare(
                 """
                 SELECT lemma, part_of_speech, pronunciations_json, forms_json, synsets_json
@@ -221,12 +225,8 @@ nonisolated final class OpenEnglishWordNetService {
         }
     }
 
-    private func lemmas(forForm form: String, databasePath: String) -> [String] {
+    private func lemmas(forForm form: String, database: SQLiteDatabase) -> [String] {
         do {
-            let database = try SQLiteDatabase(
-                url: URL(fileURLWithPath: databasePath),
-                flags: SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
-            )
             let statement = try database.prepare(
                 """
                 SELECT lemma
@@ -251,7 +251,7 @@ nonisolated final class OpenEnglishWordNetService {
         }
     }
 
-    private func lookupSynsets(ids: [String], databasePath: String) -> [String: SynsetRow] {
+    private func lookupSynsets(ids: [String], database: SQLiteDatabase) -> [String: SynsetRow] {
         let uniqueIDs = ids
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -262,10 +262,6 @@ nonisolated final class OpenEnglishWordNetService {
         }
 
         do {
-            let database = try SQLiteDatabase(
-                url: URL(fileURLWithPath: databasePath),
-                flags: SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
-            )
             let placeholders = Array(repeating: "?", count: uniqueIDs.count).joined(separator: ",")
             let statement = try database.prepare(
                 """
@@ -297,12 +293,8 @@ nonisolated final class OpenEnglishWordNetService {
         }
     }
 
-    private func prefixEntries(prefix: String, databasePath: String, limit: Int) -> [EntryRow] {
+    private func prefixEntries(prefix: String, database: SQLiteDatabase, limit: Int) -> [EntryRow] {
         do {
-            let database = try SQLiteDatabase(
-                url: URL(fileURLWithPath: databasePath),
-                flags: SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
-            )
             let statement = try database.prepare(
                 """
                 SELECT lemma, part_of_speech, pronunciations_json, forms_json, synsets_json
@@ -362,14 +354,14 @@ nonisolated final class OpenEnglishWordNetService {
         originalTerm: String,
         fallbackKind: EntryKind,
         reason: LookupSuggestionReason,
-        databasePath: String
+        database: SQLiteDatabase
     ) -> [LookupSuggestion] {
         lookupSuggestionsForEntries(
-            lemmas.flatMap { entryRows(forLemma: $0, databasePath: databasePath) },
+            lemmas.flatMap { entryRows(forLemma: $0, database: database) },
             originalTerm: originalTerm,
             fallbackKind: fallbackKind,
             reason: reason,
-            databasePath: databasePath
+            database: database
         )
     }
 
@@ -378,7 +370,7 @@ nonisolated final class OpenEnglishWordNetService {
         originalTerm: String,
         fallbackKind: EntryKind,
         reason: LookupSuggestionReason,
-        databasePath: String
+        database: SQLiteDatabase
     ) -> [LookupSuggestion] {
         let distinctEntries = deduplicatedEntries(entries)
         guard !distinctEntries.isEmpty else {
@@ -387,7 +379,7 @@ nonisolated final class OpenEnglishWordNetService {
 
         let synsets = lookupSynsets(
             ids: distinctEntries.flatMap(\.synsetIDs),
-            databasePath: databasePath
+            database: database
         )
 
         return distinctEntries.compactMap { entry in

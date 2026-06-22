@@ -194,25 +194,10 @@ struct OpenAIContentGenerator: AIContentGenerator {
     }
 
     func generateContent(term: String, sourceContext: String, kind: EntryKind, settings: AppSettings) async throws -> GeneratedEntryContent {
-        var request = URLRequest(url: Self.endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try requestBody(term: term, sourceContext: sourceContext, kind: kind)
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw OpenAIContentGeneratorError.invalidResponse
-        }
-
-        guard 200..<300 ~= httpResponse.statusCode else {
-            let message = decodeAPIErrorMessage(from: data) ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
-            throw OpenAIContentGeneratorError.requestFailed(statusCode: httpResponse.statusCode, message: message)
-        }
-
-        let payload = try decoder.decode(OpenAIResponsesPayload.self, from: data)
-        let structuredText = try payload.structuredOutputText()
+        let client = OpenAIResponsesClient(apiKey: apiKey, session: session)
+        let structuredText = try await client.requestStructuredOutput(
+            body: try requestBody(term: term, sourceContext: sourceContext, kind: kind)
+        )
         let structuredDraft = try decoder.decode(OpenAIStructuredDraft.self, from: Data(structuredText.utf8))
 
         return GeneratedEntryContent(
@@ -327,17 +312,6 @@ struct OpenAIContentGenerator: AIContentGenerator {
         return try JSONSerialization.data(withJSONObject: body, options: [])
     }
 
-    private func decodeAPIErrorMessage(from data: Data) -> String? {
-        guard
-            let payload = try? decoder.decode(OpenAIErrorPayload.self, from: data),
-            let message = payload.error.message?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !message.isEmpty
-        else {
-            return nil
-        }
-
-        return message
-    }
 }
 
 private struct OpenAIStructuredDraft: Decodable {
@@ -356,62 +330,6 @@ private struct OpenAIStructuredDraft: Decodable {
             maxMeanings: EntryCandidateDefaults.meaningChoiceCount
         )
         exampleChoices = try container.decodeIfPresent([String].self, forKey: .exampleChoices) ?? []
-    }
-}
-
-private struct OpenAIResponsesPayload: Decodable {
-    let outputText: String?
-    let output: [OutputItem]?
-
-    enum CodingKeys: String, CodingKey {
-        case outputText = "output_text"
-        case output
-    }
-
-    func structuredOutputText() throws -> String {
-        if let outputText, !outputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return outputText
-        }
-
-        let text = output?
-            .compactMap(\.content)
-            .flatMap { $0 }
-            .compactMap(\.text)
-            .joined(separator: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if let text, !text.isEmpty {
-            return text
-        }
-
-        let refusal = output?
-            .compactMap(\.content)
-            .flatMap { $0 }
-            .compactMap(\.refusal)
-            .first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
-
-        if let refusal {
-            throw OpenAIContentGeneratorError.modelRefused(refusal)
-        }
-
-        throw OpenAIContentGeneratorError.emptyOutput
-    }
-
-    struct OutputItem: Decodable {
-        let content: [OutputContent]?
-    }
-
-    struct OutputContent: Decodable {
-        let text: String?
-        let refusal: String?
-    }
-}
-
-private struct OpenAIErrorPayload: Decodable {
-    let error: ErrorDetail
-
-    struct ErrorDetail: Decodable {
-        let message: String?
     }
 }
 

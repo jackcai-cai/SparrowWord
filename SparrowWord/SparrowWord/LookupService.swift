@@ -288,25 +288,10 @@ struct OpenAILookupGenerator {
 
     nonisolated
     func generateLookup(term: String, kind: EntryKind) async throws -> LookupContent {
-        var request = URLRequest(url: Self.endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try requestBody(term: term, kind: kind)
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw OpenAIContentGeneratorError.invalidResponse
-        }
-
-        guard 200..<300 ~= httpResponse.statusCode else {
-            let message = decodeAPIErrorMessage(from: data) ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
-            throw OpenAIContentGeneratorError.requestFailed(statusCode: httpResponse.statusCode, message: message)
-        }
-
-        let payload = try decoder.decode(LookupResponsesPayload.self, from: data)
-        let structuredText = try payload.structuredOutputText()
+        let client = OpenAIResponsesClient(apiKey: apiKey, session: session)
+        let structuredText = try await client.requestStructuredOutput(
+            body: try requestBody(term: term, kind: kind)
+        )
         let structuredLookup = try decoder.decode(OpenAIStructuredLookup.self, from: Data(structuredText.utf8))
 
         return LookupContent(
@@ -440,18 +425,6 @@ struct OpenAILookupGenerator {
         return try JSONSerialization.data(withJSONObject: body, options: [])
     }
 
-    nonisolated
-    private func decodeAPIErrorMessage(from data: Data) -> String? {
-        guard
-            let payload = try? decoder.decode(LookupErrorPayload.self, from: data),
-            let message = payload.error.message?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !message.isEmpty
-        else {
-            return nil
-        }
-
-        return message
-    }
 }
 
 private struct OpenAIChineseLookupResolver {
@@ -483,25 +456,10 @@ private struct OpenAIChineseLookupResolver {
 
     nonisolated
     func resolveCandidates(chinese: String, preferredKind: EntryKind) async throws -> [ChineseLookupCandidateResolution] {
-        var request = URLRequest(url: Self.endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try requestBody(chinese: chinese, preferredKind: preferredKind)
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw OpenAIContentGeneratorError.invalidResponse
-        }
-
-        guard 200..<300 ~= httpResponse.statusCode else {
-            let message = decodeAPIErrorMessage(from: data) ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
-            throw OpenAIContentGeneratorError.requestFailed(statusCode: httpResponse.statusCode, message: message)
-        }
-
-        let payload = try decoder.decode(LookupResponsesPayload.self, from: data)
-        let structuredText = try payload.structuredOutputText()
+        let client = OpenAIResponsesClient(apiKey: apiKey, session: session)
+        let structuredText = try await client.requestStructuredOutput(
+            body: try requestBody(chinese: chinese, preferredKind: preferredKind)
+        )
         let structuredCandidates = try decoder.decode(OpenAIChineseLookupCandidatesPayload.self, from: Data(structuredText.utf8))
         let candidates = structuredCandidates.candidates.compactMap { candidate -> ChineseLookupCandidateResolution? in
             let english = candidate.english.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -614,18 +572,6 @@ private struct OpenAIChineseLookupResolver {
         return try JSONSerialization.data(withJSONObject: body, options: [])
     }
 
-    nonisolated
-    private func decodeAPIErrorMessage(from data: Data) -> String? {
-        guard
-            let payload = try? decoder.decode(LookupErrorPayload.self, from: data),
-            let message = payload.error.message?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !message.isEmpty
-        else {
-            return nil
-        }
-
-        return message
-    }
 }
 
 private struct OpenAIStructuredLookup: Decodable {
@@ -675,60 +621,4 @@ private struct OpenAIChineseLookupCandidate: Decodable {
 
 private struct OpenAIChineseLookupCandidatesPayload: Decodable {
     let candidates: [OpenAIChineseLookupCandidate]
-}
-
-private struct LookupResponsesPayload: Decodable {
-    let outputText: String?
-    let output: [OutputItem]?
-
-    enum CodingKeys: String, CodingKey {
-        case outputText = "output_text"
-        case output
-    }
-
-    func structuredOutputText() throws -> String {
-        if let outputText, !outputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return outputText
-        }
-
-        let text = output?
-            .compactMap(\.content)
-            .flatMap { $0 }
-            .compactMap(\.text)
-            .joined(separator: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if let text, !text.isEmpty {
-            return text
-        }
-
-        let refusal = output?
-            .compactMap(\.content)
-            .flatMap { $0 }
-            .compactMap(\.refusal)
-            .first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
-
-        if let refusal {
-            throw OpenAIContentGeneratorError.modelRefused(refusal)
-        }
-
-        throw OpenAIContentGeneratorError.emptyOutput
-    }
-
-    struct OutputItem: Decodable {
-        let content: [OutputContent]?
-    }
-
-    struct OutputContent: Decodable {
-        let text: String?
-        let refusal: String?
-    }
-}
-
-private struct LookupErrorPayload: Decodable {
-    let error: ErrorDetail
-
-    struct ErrorDetail: Decodable {
-        let message: String?
-    }
 }

@@ -3193,91 +3193,11 @@ private struct LookupDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: prefersCompactChrome ? 14 : 18) {
-                Group {
-                    VStack(alignment: .leading, spacing: prefersCompactChrome ? 10 : 12) {
-                        detailHeaderContent
-                        pronunciationChrome
-                    }
-                }
-
-                if record.reverseLookupCandidates.isEmpty,
-                   let onOpenInQuickCapture {
-                    Button(language.text("快速录入", "Quick Capture")) {
-                        onOpenInQuickCapture()
-                    }
-                    .buttonStyle(.bordered)
-                }
-
-                if let loadingMessage {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(loadingMessage.localized(in: language))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(Color(nsColor: .controlBackgroundColor))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
-                if let historyStatusMessage {
-                    infoBlock(title: "查询状态".localized(in: language)) {
-                        Text(historyStatusMessage)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(Color(nsColor: .controlBackgroundColor))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .foregroundStyle(statusForegroundStyle)
-                    }
-                }
-
-                infoBlock(title: meaningsTitle) {
-                    if meaningSections.isEmpty, loadingMessage != nil {
-                        Text("正在加载中文释义...".localized(in: language))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(Color(nsColor: .controlBackgroundColor))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .foregroundStyle(.secondary)
-                    } else if meaningSections.isEmpty {
-                        Text(meaningsFallbackMessage)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(Color(nsColor: .controlBackgroundColor))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(meaningSections) { section in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    ForEach(section.lines, id: \.self) { line in
-                                        meaningRow(line)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if !record.reverseLookupCandidates.isEmpty {
-                    infoBlock(title: "英文候选".localized(in: language)) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            ForEach(record.reverseLookupCandidates) { candidate in
-                                ReverseLookupCandidateRow(
-                                    candidate: candidate,
-                                    action: onSelectReverseCandidate,
-                                    onOpenInQuickCapture: onOpenReverseCandidateInQuickCapture,
-                                    prefersCompactActions: prefersCompactChrome,
-                                    language: language
-                                )
-                            }
-                        }
-                    }
-                }
+                headerSection
+                loadingSection
+                statusSection
+                meaningsSection
+                reverseCandidatesSection
 
                 EnglishDefinitionSection(
                     title: "英文释义".localized(in: language),
@@ -3287,96 +3207,11 @@ private struct LookupDetailView: View {
                     prefersCompactChrome: prefersCompactChrome
                 )
 
-                if !record.content.inflectionLines.isEmpty, record.content.kind != .sentence {
-                    supplementaryInfoSection(
-                        title: "词形变化 / 词形关系".localized(in: language),
-                        isInitiallyExpanded: !prefersCompactChrome
-                    ) {
-                        SimpleTextCards(lines: localizedInflectionLines, compact: prefersCompactChrome)
-                    }
-                }
-
-                if showsReferenceTags, !record.content.referenceTags.isEmpty {
-                    supplementaryInfoSection(
-                        title: "词频 / 词典标签".localized(in: language),
-                        isInitiallyExpanded: false
-                    ) {
-                        FlowTagsView(tags: localizedReferenceTags, compact: prefersCompactChrome)
-                    }
-                }
-
-                if !record.content.examples.isEmpty || isLoadingExamples {
-                    infoBlock(title: examplesTitle) {
-                        if record.content.examples.isEmpty {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("正在补充例句...".localized(in: language))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(Color(nsColor: .controlBackgroundColor))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        } else {
-                            VStack(alignment: .leading, spacing: 12) {
-                                ForEach(record.content.examples) { example in
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(example.english)
-                                        Text(example.chinese)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 10)
-                                    .background(Color(nsColor: .controlBackgroundColor))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if record.content.kind != .sentence {
-                    supplementaryInfoSection(
-                        title: "常见搭配 / 短语".localized(in: language),
-                        isInitiallyExpanded: false
-                    ) {
-                        if record.content.collocations.isEmpty, loadingMessage != nil {
-                            Text("正在补充常见搭配...".localized(in: language))
-                                .foregroundStyle(.secondary)
-                        } else if record.content.collocations.isEmpty {
-                            Text("这次结果里没有给出实用搭配。".localized(in: language))
-                                .foregroundStyle(.secondary)
-                        } else {
-                            FlowTagsView(tags: record.content.collocations, compact: prefersCompactChrome)
-                        }
-                    }
-                }
-
-                if showsHistoryMeta {
-                    infoBlock(title: "这次查词记录".localized(in: language)) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("\("时间：".localized(in: language))\(record.queriedAt.formatted(date: .abbreviated, time: .shortened))")
-                            if trimmedOriginalQuery != record.content.term {
-                                Text("\("原始查询：".localized(in: language))\(trimmedOriginalQuery)")
-                            }
-                            Text("\("来源：".localized(in: language))\(record.source.title.localized(in: language))")
-                            Text("\("学习动作：".localized(in: language))\(record.studyAction.title.localized(in: language))")
-
-                            if let modelName = record.modelName, !modelName.isEmpty {
-                                Text("\("模型：".localized(in: language))\(modelName)")
-                            }
-
-                            Text("\("状态：".localized(in: language))\(record.status.title.localized(in: language))")
-                            if let statusMessage = record.statusMessage,
-                               !statusMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                Text("\("说明：".localized(in: language))\(statusMessage.localized(in: language))")
-                            }
-                        }
-                        .foregroundStyle(.secondary)
-                    }
-                }
+                inflectionSection
+                referenceTagsSection
+                examplesSection
+                collocationsSection
+                historyMetaSection
             }
             .padding(24)
             .frame(maxWidth: prefersCompactChrome ? .infinity : 760, alignment: .leading)
@@ -3399,6 +3234,212 @@ private struct LookupDetailView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 8)
                 .padding(.bottom, 12)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var headerSection: some View {
+        Group {
+            VStack(alignment: .leading, spacing: prefersCompactChrome ? 10 : 12) {
+                detailHeaderContent
+                pronunciationChrome
+            }
+        }
+
+        if record.reverseLookupCandidates.isEmpty,
+           let onOpenInQuickCapture {
+            Button(language.text("快速录入", "Quick Capture")) {
+                onOpenInQuickCapture()
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    @ViewBuilder
+    private var loadingSection: some View {
+        if let loadingMessage {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(loadingMessage.localized(in: language))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    @ViewBuilder
+    private var statusSection: some View {
+        if let historyStatusMessage {
+            infoBlock(title: "查询状态".localized(in: language)) {
+                Text(historyStatusMessage)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(statusForegroundStyle)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var meaningsSection: some View {
+        infoBlock(title: meaningsTitle) {
+            if meaningSections.isEmpty, loadingMessage != nil {
+                Text("正在加载中文释义...".localized(in: language))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(.secondary)
+            } else if meaningSections.isEmpty {
+                Text(meaningsFallbackMessage)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(meaningSections) { section in
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(section.lines, id: \.self) { line in
+                                meaningRow(line)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var reverseCandidatesSection: some View {
+        if !record.reverseLookupCandidates.isEmpty {
+            infoBlock(title: "英文候选".localized(in: language)) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(record.reverseLookupCandidates) { candidate in
+                        ReverseLookupCandidateRow(
+                            candidate: candidate,
+                            action: onSelectReverseCandidate,
+                            onOpenInQuickCapture: onOpenReverseCandidateInQuickCapture,
+                            language: language
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var inflectionSection: some View {
+        if !record.content.inflectionLines.isEmpty, record.content.kind != .sentence {
+            supplementaryInfoSection(
+                title: "词形变化 / 词形关系".localized(in: language),
+                isInitiallyExpanded: !prefersCompactChrome
+            ) {
+                SimpleTextCards(lines: localizedInflectionLines, compact: prefersCompactChrome)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var referenceTagsSection: some View {
+        if showsReferenceTags, !record.content.referenceTags.isEmpty {
+            supplementaryInfoSection(
+                title: "词频 / 词典标签".localized(in: language),
+                isInitiallyExpanded: false
+            ) {
+                FlowTagsView(tags: localizedReferenceTags, compact: prefersCompactChrome)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var examplesSection: some View {
+        if !record.content.examples.isEmpty || isLoadingExamples {
+            infoBlock(title: examplesTitle) {
+                if record.content.examples.isEmpty {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("正在补充例句...".localized(in: language))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(record.content.examples) { example in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(example.english)
+                                Text(example.chinese)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var collocationsSection: some View {
+        if record.content.kind != .sentence {
+            supplementaryInfoSection(
+                title: "常见搭配 / 短语".localized(in: language),
+                isInitiallyExpanded: false
+            ) {
+                if record.content.collocations.isEmpty, loadingMessage != nil {
+                    Text("正在补充常见搭配...".localized(in: language))
+                        .foregroundStyle(.secondary)
+                } else if record.content.collocations.isEmpty {
+                    Text("这次结果里没有给出实用搭配。".localized(in: language))
+                        .foregroundStyle(.secondary)
+                } else {
+                    FlowTagsView(tags: record.content.collocations, compact: prefersCompactChrome)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var historyMetaSection: some View {
+        if showsHistoryMeta {
+            infoBlock(title: "这次查词记录".localized(in: language)) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\("时间：".localized(in: language))\(record.queriedAt.formatted(date: .abbreviated, time: .shortened))")
+                    if trimmedOriginalQuery != record.content.term {
+                        Text("\("原始查询：".localized(in: language))\(trimmedOriginalQuery)")
+                    }
+                    Text("\("来源：".localized(in: language))\(record.source.title.localized(in: language))")
+                    Text("\("学习动作：".localized(in: language))\(record.studyAction.title.localized(in: language))")
+
+                    if let modelName = record.modelName, !modelName.isEmpty {
+                        Text("\("模型：".localized(in: language))\(modelName)")
+                    }
+
+                    Text("\("状态：".localized(in: language))\(record.status.title.localized(in: language))")
+                    if let statusMessage = record.statusMessage,
+                       !statusMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("\("说明：".localized(in: language))\(statusMessage.localized(in: language))")
+                    }
+                }
+                .foregroundStyle(.secondary)
             }
         }
     }
@@ -3626,48 +3667,11 @@ private struct LookupDetailView: View {
     @ViewBuilder
     private func meaningRow(_ meaning: String) -> some View {
         Text(meaning)
-            .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-private struct MeaningGroupsSummarySection: View {
-    let title: String
-    let meaningGroups: [MeaningGroup]
-    let kind: EntryKind
-
-    private var sections: [MeaningDisplaySection] {
-        DisplayFormatting.prefixedMeaningSections(
-            meaningGroups: meaningGroups,
-            kind: kind,
-            maxLineLength: 26
-        )
-    }
-
-    var body: some View {
-        if !sections.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(title)
-                    .font(.headline)
-
-                ForEach(sections) { section in
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(section.lines, id: \.self) { line in
-                            Text(line)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(Color(nsColor: .controlBackgroundColor))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -4022,7 +4026,6 @@ private struct ReverseLookupCandidateRow: View {
     let candidate: ReverseLookupCandidate
     let action: ((ReverseLookupCandidate) -> Void)?
     let onOpenInQuickCapture: ((ReverseLookupCandidate) -> Void)?
-    let prefersCompactActions: Bool
     var language: AppDisplayLanguage = .chinese
 
     var body: some View {
@@ -4038,37 +4041,19 @@ private struct ReverseLookupCandidateRow: View {
 
             Spacer()
 
-            if prefersCompactActions {
-                VStack(alignment: .trailing, spacing: 8) {
-                    if let action {
-                        Button("继续查这个词".localized(in: language)) {
-                            action(candidate)
-                        }
-                        .buttonStyle(.borderedProminent)
+            VStack(alignment: .trailing, spacing: 8) {
+                if let action {
+                    Button("继续查这个词".localized(in: language)) {
+                        action(candidate)
                     }
-
-                    if let onOpenInQuickCapture {
-                        Button(language.text("快速录入", "Quick Capture")) {
-                            onOpenInQuickCapture(candidate)
-                        }
-                        .buttonStyle(.bordered)
-                    }
+                    .buttonStyle(.borderedProminent)
                 }
-            } else {
-                VStack(alignment: .trailing, spacing: 8) {
-                    if let action {
-                        Button("继续查这个词".localized(in: language)) {
-                            action(candidate)
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
 
-                    if let onOpenInQuickCapture {
-                        Button(language.text("快速录入", "Quick Capture")) {
-                            onOpenInQuickCapture(candidate)
-                        }
-                        .buttonStyle(.bordered)
+                if let onOpenInQuickCapture {
+                    Button(language.text("快速录入", "Quick Capture")) {
+                        onOpenInQuickCapture(candidate)
                     }
+                    .buttonStyle(.bordered)
                 }
             }
         }

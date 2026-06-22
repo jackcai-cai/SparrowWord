@@ -24,21 +24,6 @@ enum ProficiencyLevel: Int, Codable, CaseIterable, Identifiable, Comparable {
         }
     }
 
-    var reviewWeight: Int {
-        switch self {
-        case .unknown:
-            return 5
-        case .shaky:
-            return 4
-        case .familiar:
-            return 3
-        case .comfortable:
-            return 2
-        case .mastered:
-            return 0
-        }
-    }
-
     func upgraded() -> ProficiencyLevel {
         ProficiencyLevel(rawValue: min(rawValue + 1, Self.mastered.rawValue)) ?? self
     }
@@ -249,11 +234,6 @@ enum ReviewSourceKind: String, Codable, CaseIterable, Identifiable, Hashable {
         default:
             self = .history
         }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(rawValue)
     }
 }
 
@@ -471,11 +451,6 @@ struct EntrySortRule: Codable, Equatable, Identifiable {
     nonisolated init(criterion: EntrySortCriterion, direction: EntrySortDirection) {
         self.criterion = criterion
         self.direction = direction
-    }
-
-    nonisolated init(criterion: EntrySortCriterion, isAscending: Bool) {
-        self.criterion = criterion
-        self.direction = isAscending ? .ascending : .descending
     }
 
     enum CodingKeys: String, CodingKey {
@@ -1796,11 +1771,6 @@ enum LookupStudyAction: String, Codable, Equatable, Sendable {
             self = .historyOnly
         }
     }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(rawValue)
-    }
 }
 
 struct LookupHistoryRecord: Codable, Equatable, Identifiable, Sendable {
@@ -1960,11 +1930,6 @@ enum TrashSourceCategory: String, Codable, CaseIterable, Identifiable {
         default:
             self = .library
         }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(rawValue)
     }
 }
 
