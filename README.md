@@ -2,11 +2,22 @@
 
 > A fast, offline-first vocabulary companion for English readers — look up a word, keep it, and review it later, without breaking your reading flow.
 
+[![Latest release](https://img.shields.io/github/v/release/jackcai-cai/SparrowWord?label=release)](https://github.com/jackcai-cai/SparrowWord/releases/latest)
+[![Platform: macOS](https://img.shields.io/badge/platform-macOS-111111)](https://github.com/jackcai-cai/SparrowWord/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/jackcai-cai/SparrowWord)](LICENSE)
+
+**English** · [中文说明](README.zh-CN.md)
+
+### ⬇️ [Download for macOS — v1.1](https://github.com/jackcai-cai/SparrowWord/releases/latest)
+
+> Unsigned build — on first launch, **right-click the app → Open → Open** (one time).
+
 SparrowWord is a vocabulary-learning project I designed and built end-to-end: a native **macOS app**, a **web app**, and the **dictionary API** behind them. It turns the usual scattered routine — dictionary in one app, notes in another, flashcards in a third — into a single loop: **look up → capture → review.**
 
 ## Highlights
 
 - 🔎 **Offline English lookup, zero setup** — the macOS app ships with a bundled dictionary, so English word → Chinese meaning works the moment you open it. No downloads, no imports.
+- 🀄 **Offline Chinese → English reverse lookup** — type Chinese, get ranked English candidates instantly, fully offline (v1.1). Import CC-CEDICT later for fuller coverage.
 - ⚡ **Quick Capture** — save a word with its context, example, and notes in seconds.
 - 🔁 **Spaced-repetition review** — multiple question types with Again / Hard / Good / Easy.
 - 🗂️ **Personal library & history** — everything you look up and keep, organized.
@@ -16,13 +27,13 @@ SparrowWord is a vocabulary-learning project I designed and built end-to-end: a 
 
 These light up once you import the matching open datasets (see [Dictionaries](#dictionaries)):
 
-- 🀄 Chinese → English reverse lookup (CC-CEDICT)
+- 🀄 Fuller Chinese ↔ English coverage (CC-CEDICT), on top of the built-in offline reverse lookup
 - 📚 Example sentences (Tatoeba) and fuller English definitions (Open English WordNet)
 - 🧠 AI-assisted definitions via OpenAI (optional; falls back to offline)
 
 ## Download (macOS)
 
-Get the latest build from **[Releases](../../releases)**.
+**[⬇️ Download the latest release (v1.1)](https://github.com/jackcai-cai/SparrowWord/releases/latest)**
 
 > Not notarized yet — on first launch, **right-click the app → Open → Open**.
 
