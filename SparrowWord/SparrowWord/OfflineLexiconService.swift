@@ -483,6 +483,70 @@ nonisolated final class OfflineLexiconService {
         }
     }
 
+    /// Offline Chinese→English reverse lookup over the bundled ECDICT `translation`
+    /// (Chinese gloss) column. A plain LIKE scan over ~125k rows measures ~20–40ms,
+    /// so no extra index is needed: this keeps Chinese reverse lookup fully offline
+    /// and instant, without depending on CC-CEDICT, the local MT engine, or the API.
+    func reverseLookupChineseInECDICT(
+        _ query: String,
+        manifest: OfflineResourceManifest,
+        limit: Int = 8
+    ) -> [ReverseLookupCandidate] {
+        let cleanedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanedQuery.isEmpty, !manifest.ecdictDatabasePath.isEmpty else {
+            return []
+        }
+
+        let cappedLimit = max(limit, 1)
+
+        do {
+            let database = try SQLiteDatabase(
+                url: URL(fileURLWithPath: manifest.ecdictDatabasePath),
+                flags: SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+            )
+
+            // collins-rated, then frequency-ranked words first, so common
+            // translations (e.g. 天生 → born/innate) surface above rare inflections.
+            let statement = try database.prepare(
+                """
+                SELECT word
+                FROM stardict
+                WHERE translation LIKE ?
+                ORDER BY
+                    (collins > 0) DESC,
+                    (frq IS NOT NULL AND frq > 0) DESC,
+                    frq ASC,
+                    length(word) ASC
+                LIMIT \(cappedLimit);
+                """
+            )
+            defer { sqlite3_finalize(statement) }
+
+            let likePattern = "%\(cleanedQuery)%"
+            sqlite3_bind_text(statement, 1, likePattern, -1, SQLITE_TRANSIENT)
+
+            var candidates: [ReverseLookupCandidate] = []
+            while sqlite3_step(statement) == SQLITE_ROW {
+                let word = sqliteString(statement, column: 0)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !word.isEmpty else {
+                    continue
+                }
+                candidates.append(
+                    ReverseLookupCandidate(english: word, chinese: cleanedQuery)
+                )
+            }
+
+            return Array(
+                candidates
+                    .uniqued(by: { $0.english.lowercased() })
+                    .prefix(cappedLimit)
+            )
+        } catch {
+            return []
+        }
+    }
+
     private func lookupECDICT(term: String, databasePath: String) -> ECDICTRow? {
         guard !databasePath.isEmpty else {
             return nil

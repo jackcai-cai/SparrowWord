@@ -2452,6 +2452,41 @@ final class AppState: ObservableObject {
             return
         }
 
+        // Offline ECDICT reverse lookup (Chinese gloss → English) before falling
+        // back to the slow engines. This is the path that keeps Chinese reverse
+        // lookup instant and offline for words CC-CEDICT doesn't cover.
+        let ecdictReverseOptions = OfflineLexiconService.shared
+            .reverseLookupChineseInECDICT(
+                draft.trimmedTerm,
+                manifest: settings.offlineResources
+            )
+            .map { ChineseLookupOption(candidate: $0, sourcePrimary: .ecdict) }
+
+        if ecdictReverseOptions.count > 1 {
+            presentChineseLookupCandidates(
+                ecdictReverseOptions,
+                query: draft.trimmedTerm,
+                preferredKind: draft.kind,
+                requestID: requestID,
+                correction: correction
+            )
+            return
+        }
+
+        if let ecdictOption = ecdictReverseOptions.first {
+            await continueResolvedChineseCandidateLookup(
+                draft,
+                candidate: ecdictOption.candidate,
+                requestID: requestID,
+                correction: correction,
+                settings: settings,
+                sourcePrimary: ecdictOption.sourcePrimary,
+                resolvedKind: ecdictOption.resolvedKind,
+                modelName: ecdictOption.modelName
+            )
+            return
+        }
+
         async let translationOptionsTask = translationLookupOptions(
             chinese: draft.trimmedTerm,
             preferredKind: draft.kind,
